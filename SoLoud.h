@@ -38,6 +38,24 @@ namespace fdm::SoLoud
 #include "Wav.h"
 #include "WavInstance.h"
 
+#define FOR_ALL_VOICES_PRE \
+		SoLoud::handle *h_ = NULL; \
+		SoLoud::handle th_[2] = { aVoiceHandle, 0 }; \
+		lockAudioMutex_internal(); \
+		h_ = voiceGroupHandleToArray_internal(aVoiceHandle); \
+		if (h_ == NULL) h_ = th_; \
+		while (*h_) \
+		{ \
+			int ch = getVoiceFromHandle_internal(*h_); \
+			if (ch != -1)  \
+			{
+
+#define FOR_ALL_VOICES_POST \
+			} \
+			h_++; \
+		} \
+		unlockAudioMutex_internal();
+
 namespace fdm
 {
 	namespace SoLoud
@@ -87,7 +105,7 @@ namespace fdm
 			SoLoud::AlignedFloatBuffer mOutputScratch; // 0x48
 			SoLoud::AlignedFloatBuffer* mResampleData; // 0x60
 			SoLoud::AudioSourceInstance** mResampleDataOwner; // 0x68
-			SoLoud::AudioSourceInstance* mVoice[1024]; // 0x70
+			SoLoud::AudioSourceInstance* mVoice[VOICE_COUNT]; // 0x70
 			uint32_t mSamplerate; // 0x2070
 			uint32_t mChannels; // 0x2074
 			uint32_t mBackendID; // 0x2078
@@ -115,19 +133,19 @@ namespace fdm
 			float m3dSoundSpeed; // 0x2DB0
 			float m3dSpeakerPosition[24]; // 0x2DB4
 			PAD(0x4);
-			SoLoud::AudioSourceInstance3dData m3dData[1024]; // 0x2E18
+			SoLoud::AudioSourceInstance3dData m3dData[VOICE_COUNT]; // 0x2E18
 			uint32_t** mVoiceGroup; // 0x20E18
 			uint32_t mVoiceGroupCount; // 0x20E20
-			uint32_t mActiveVoice[1024]; // 0x20E24
+			uint32_t mActiveVoice[VOICE_COUNT]; // 0x20E24
 			uint32_t mActiveVoiceCount; // 0x21E24
 			bool mActiveVoiceDirty; // 0x21E28
 			uint32_t play(SoLoud::AudioSource& aSound, float aVolume, float aPan, bool aPaused, uint32_t aBus)
 			{
 				return reinterpret_cast<uint32_t(__thiscall*)(SoLoud::Soloud * self, SoLoud::AudioSource&, float, float, bool, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::play))(this, aSound, aVolume, aPan, aPaused, aBus);
 			}
-			void stop(uint32_t aVoiceHandle)
+			void stop(SoLoud::handle aVoiceHandle)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::stop))(this, aVoiceHandle);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle)>(getFuncAddr((int)Func::SoLoud::Soloud::stop))(this, aVoiceHandle);
 			}
 			void stopAll()
 			{
@@ -137,17 +155,17 @@ namespace fdm
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::AudioSource&)>(getFuncAddr((int)Func::SoLoud::Soloud::stopAudioSource))(this, aSound);
 			}
-			uint32_t addVoiceToGroup(uint32_t aVoiceGroupHandle, uint32_t aVoiceHandle)
+			SoLoud::result addVoiceToGroup(SoLoud::handle aVoiceGroupHandle, SoLoud::handle aVoiceHandle)
 			{
-				return reinterpret_cast<uint32_t(__thiscall*)(SoLoud::Soloud * self, uint32_t, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::addVoiceToGroup))(this, aVoiceGroupHandle, aVoiceHandle);
+				return reinterpret_cast<SoLoud::result(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, SoLoud::handle)>(getFuncAddr((int)Func::SoLoud::Soloud::addVoiceToGroup))(this, aVoiceGroupHandle, aVoiceHandle);
 			}
-			uint32_t createVoiceGroup()
+			SoLoud::handle createVoiceGroup()
 			{
-				return reinterpret_cast<uint32_t(__thiscall*)(SoLoud::Soloud * self)>(getFuncAddr((int)Func::SoLoud::Soloud::createVoiceGroup))(this);
+				return reinterpret_cast<SoLoud::handle(__thiscall*)(SoLoud::Soloud * self)>(getFuncAddr((int)Func::SoLoud::Soloud::createVoiceGroup))(this);
 			}
-			uint32_t play3d(SoLoud::AudioSource& aSound, float aPosX, float aPosY, float aPosZ, float aVelX, float aVelY, float aVelZ, float aVolume, bool aPaused, uint32_t aBus)
+			SoLoud::handle play3d(SoLoud::AudioSource& aSound, float aPosX, float aPosY, float aPosZ, float aVelX, float aVelY, float aVelZ, float aVolume, bool aPaused, uint32_t aBus)
 			{
-				return reinterpret_cast<uint32_t(__thiscall*)(SoLoud::Soloud * self, SoLoud::AudioSource&, float, float, float, float, float, float, float, bool, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::play3d))(this, aSound, aPosX, aPosY, aPosZ, aVelX, aVelY, aVelZ, aVolume, aPaused, aBus);
+				return reinterpret_cast<SoLoud::handle(__thiscall*)(SoLoud::Soloud * self, SoLoud::AudioSource&, float, float, float, float, float, float, float, bool, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::play3d))(this, aSound, aPosX, aPosY, aPosZ, aVelX, aVelY, aVelZ, aVolume, aPaused, aBus);
 			}
 			void set3dListenerAt(float aAtX, float aAtY, float aAtZ)
 			{
@@ -161,21 +179,21 @@ namespace fdm
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, float, float, float)>(getFuncAddr((int)Func::SoLoud::Soloud::set3dListenerVelocity))(this, aVelocityX, aVelocityY, aVelocityZ);
 			}
-			void set3dSourceAttenuation(uint32_t aVoiceHandle, uint32_t aAttenuationModel, float aAttenuationRolloffFactor)
+			void set3dSourceAttenuation(SoLoud::handle aVoiceHandle, uint32_t aAttenuationModel, float aAttenuationRolloffFactor)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, uint32_t, float)>(getFuncAddr((int)Func::SoLoud::Soloud::set3dSourceAttenuation))(this, aVoiceHandle, aAttenuationModel, aAttenuationRolloffFactor);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, uint32_t, float)>(getFuncAddr((int)Func::SoLoud::Soloud::set3dSourceAttenuation))(this, aVoiceHandle, aAttenuationModel, aAttenuationRolloffFactor);
 			}
-			void set3dSourceParameters(uint32_t aVoiceHandle, float aPosX, float aPosY, float aPosZ, float aVelocityX, float aVelocityY, float aVelocityZ)
+			void set3dSourceParameters(SoLoud::handle aVoiceHandle, float aPosX, float aPosY, float aPosZ, float aVelocityX, float aVelocityY, float aVelocityZ)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, float, float, float, float, float, float)>(getFuncAddr((int)Func::SoLoud::Soloud::set3dSourceParameters))(this, aVoiceHandle, aPosX, aPosY, aPosZ, aVelocityX, aVelocityY, aVelocityZ);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, float, float, float, float, float, float)>(getFuncAddr((int)Func::SoLoud::Soloud::set3dSourceParameters))(this, aVoiceHandle, aPosX, aPosY, aPosZ, aVelocityX, aVelocityY, aVelocityZ);
 			}
 			void update3dAudio()
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self)>(getFuncAddr((int)Func::SoLoud::Soloud::update3dAudio))(this);
 			}
-			bool isValidVoiceHandle(uint32_t aVoiceHandle)
+			bool isValidVoiceHandle(SoLoud::handle aVoiceHandle)
 			{
-				return reinterpret_cast<bool(__thiscall*)(SoLoud::Soloud * self, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::isValidVoiceHandle))(this, aVoiceHandle);
+				return reinterpret_cast<bool(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle)>(getFuncAddr((int)Func::SoLoud::Soloud::isValidVoiceHandle))(this, aVoiceHandle);
 			}
 			Soloud()
 			{
@@ -189,7 +207,7 @@ namespace fdm
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self)>(getFuncAddr((int)Func::SoLoud::Soloud::deinit))(this);
 			}
-			uint32_t init(uint32_t aFlags, uint32_t aBackend, uint32_t aSamplerate, uint32_t aBufferSize, uint32_t aChannels)
+			SoLoud::result init(uint32_t aFlags, uint32_t aBackend, uint32_t aSamplerate, uint32_t aBufferSize, uint32_t aChannels)
 			{
 				return reinterpret_cast<uint32_t(__thiscall*)(SoLoud::Soloud * self, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::init))(this, aFlags, aBackend, aSamplerate, aBufferSize, aChannels);
 			}
@@ -197,25 +215,375 @@ namespace fdm
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, float*, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::mix))(this, aBuffer, aSamples);
 			}
-			void setDelaySamples(uint32_t aVoiceHandle, uint32_t aSamples)
+			void setDelaySamples(SoLoud::handle aVoiceHandle, uint32_t aSamples)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::setDelaySamples))(this, aVoiceHandle, aSamples);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, uint32_t)>(getFuncAddr((int)Func::SoLoud::Soloud::setDelaySamples))(this, aVoiceHandle, aSamples);
 			}
 			void setGlobalVolume(float aVolume)
 			{
 				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, float)>(getFuncAddr((int)Func::SoLoud::Soloud::setGlobalVolume))(this, aVolume);
 			}
-			void setPause(uint32_t aVoiceHandle, bool aPause)
+			void setPause(SoLoud::handle aVoiceHandle, bool aPause)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, bool)>(getFuncAddr((int)Func::SoLoud::Soloud::setPause))(this, aVoiceHandle, aPause);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, bool)>(getFuncAddr((int)Func::SoLoud::Soloud::setPause))(this, aVoiceHandle, aPause);
 			}
-			void setProtectVoice(uint32_t aVoiceHandle, bool aProtect)
+			void setProtectVoice(SoLoud::handle aVoiceHandle, bool aProtect)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, bool)>(getFuncAddr((int)Func::SoLoud::Soloud::setProtectVoice))(this, aVoiceHandle, aProtect);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, bool)>(getFuncAddr((int)Func::SoLoud::Soloud::setProtectVoice))(this, aVoiceHandle, aProtect);
 			}
-			void setVolume(uint32_t aVoiceHandle, float aVolume)
+			void setVolume(SoLoud::handle aVoiceHandle, float aVolume)
 			{
-				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, uint32_t, float)>(getFuncAddr((int)Func::SoLoud::Soloud::setVolume))(this, aVoiceHandle, aVolume);
+				return reinterpret_cast<void(__thiscall*)(SoLoud::Soloud * self, SoLoud::handle, float)>(getFuncAddr((int)Func::SoLoud::Soloud::setVolume))(this, aVoiceHandle, aVolume);
+			}
+			SoLoud::handle* voiceGroupHandleToArray_internal(SoLoud::handle aVoiceGroupHandle) const
+			{
+				if ((aVoiceGroupHandle & 0xfffff000) != 0xfffff000)
+					return NULL;
+				unsigned int c = aVoiceGroupHandle & 0xfff;
+				if (c >= mVoiceGroupCount)
+					return NULL;
+				if (mVoiceGroup[c] == NULL)
+					return NULL;
+				return mVoiceGroup[c] + 1;
+			}
+			int getVoiceFromHandle_internal(SoLoud::handle aVoiceHandle) const
+			{
+				// If this is a voice group handle, pick the first handle from the group
+				handle* h = voiceGroupHandleToArray_internal(aVoiceHandle);
+				if (h != NULL) aVoiceHandle = *h;
+
+				if (aVoiceHandle == 0)
+				{
+					return -1;
+				}
+
+				int ch = (aVoiceHandle & 0xfff) - 1;
+				unsigned int idx = aVoiceHandle >> 12;
+				if (mVoice[ch] &&
+					(mVoice[ch]->mPlayIndex & 0xfffff) == idx)
+				{
+					return ch;
+				}
+				return -1;
+			}
+			void unlockAudioMutex_internal()
+			{
+				assert(mInsideAudioThreadMutex);
+				mInsideAudioThreadMutex = false;
+				if (mAudioThreadMutex)
+				{
+					Thread::unlockMutex(mAudioThreadMutex);
+				}
+			}
+			void lockAudioMutex_internal()
+			{
+				if (mAudioThreadMutex)
+				{
+					Thread::lockMutex(mAudioThreadMutex);
+				}
+				assert(!mInsideAudioThreadMutex);
+				mInsideAudioThreadMutex = true;
+			}
+			void updateVoiceRelativePlaySpeed_internal(unsigned int aVoice)
+			{
+				assert(aVoice < VOICE_COUNT);
+				assert(mInsideAudioThreadMutex);
+				mVoice[aVoice]->mOverallRelativePlaySpeed = m3dData[aVoice].mDopplerValue * mVoice[aVoice]->mSetRelativePlaySpeed;
+				mVoice[aVoice]->mSamplerate = mVoice[aVoice]->mBaseSamplerate * mVoice[aVoice]->mOverallRelativePlaySpeed;
+			}
+			SoLoud::result setVoiceRelativePlaySpeed_internal(unsigned int aVoice, float aSpeed)
+			{
+				assert(aVoice < VOICE_COUNT);
+				assert(mInsideAudioThreadMutex);
+				if (aSpeed <= 0.0f)
+				{
+					return 1; // INVALID_PARAMETER
+				}
+
+				if (mVoice[aVoice])
+				{
+					mVoice[aVoice]->mSetRelativePlaySpeed = aSpeed;
+					updateVoiceRelativePlaySpeed_internal(aVoice);
+				}
+
+				return 0;
+			}
+			SoLoud::result setRelativePlaySpeed(SoLoud::handle aVoiceHandle, float aSpeed)
+			{
+				result retVal = 0;
+				FOR_ALL_VOICES_PRE
+					mVoice[ch]->mRelativePlaySpeedFader.mActive = 0;
+					retVal = setVoiceRelativePlaySpeed_internal(ch, aSpeed);
+				FOR_ALL_VOICES_POST
+				return retVal;
+			}
+			void setSamplerate(SoLoud::handle aVoiceHandle, float aSamplerate)
+			{
+				FOR_ALL_VOICES_PRE
+					mVoice[ch]->mBaseSamplerate = aSamplerate;
+					updateVoiceRelativePlaySpeed_internal(ch);
+				FOR_ALL_VOICES_POST
+			}
+			void setPan(SoLoud::handle aVoiceHandle, float aPan)
+			{
+				FOR_ALL_VOICES_PRE
+					assert(ch < VOICE_COUNT);
+					assert(mInsideAudioThreadMutex);
+					if (mVoice[ch])
+					{
+						mVoice[ch]->mPan = aPan;
+						float l = (float)cos((aPan + 1) * M_PI / 4);
+						float r = (float)sin((aPan + 1) * M_PI / 4);
+						mVoice[ch]->mChannelVolume[0] = l;
+						mVoice[ch]->mChannelVolume[1] = r;
+						if (mVoice[ch]->mChannels == 4)
+						{
+							mVoice[ch]->mChannelVolume[2] = l;
+							mVoice[ch]->mChannelVolume[3] = r;
+						}
+						if (mVoice[ch]->mChannels == 6)
+						{
+							mVoice[ch]->mChannelVolume[2] = 1.0f / (float)sqrt(2.0f);
+							mVoice[ch]->mChannelVolume[3] = 1;
+							mVoice[ch]->mChannelVolume[4] = l;
+							mVoice[ch]->mChannelVolume[5] = r;
+						}
+						if (mVoice[ch]->mChannels == 8)
+						{
+							mVoice[ch]->mChannelVolume[2] = 1.0f / (float)sqrt(2.0f);
+							mVoice[ch]->mChannelVolume[3] = 1;
+							mVoice[ch]->mChannelVolume[4] = l;
+							mVoice[ch]->mChannelVolume[5] = r;
+							mVoice[ch]->mChannelVolume[6] = l;
+							mVoice[ch]->mChannelVolume[7] = r;
+						}
+					}
+				FOR_ALL_VOICES_POST
+			}
+			void setPanAbsolute(SoLoud::handle aVoiceHandle, float aLVolume, float aRVolume, float aLBVolume, float aRBVolume, float aCVolume, float aSVolume)
+			{
+				FOR_ALL_VOICES_PRE
+					mVoice[ch]->mPanFader.mActive = 0;
+					mVoice[ch]->mChannelVolume[0] = aLVolume;
+					mVoice[ch]->mChannelVolume[1] = aRVolume;
+					if (mVoice[ch]->mChannels == 4)
+					{
+						mVoice[ch]->mChannelVolume[2] = aLBVolume;
+						mVoice[ch]->mChannelVolume[3] = aRBVolume;
+					}
+					if (mVoice[ch]->mChannels == 6)
+					{
+						mVoice[ch]->mChannelVolume[2] = aCVolume;
+						mVoice[ch]->mChannelVolume[3] = aSVolume;
+						mVoice[ch]->mChannelVolume[4] = aLBVolume;
+						mVoice[ch]->mChannelVolume[5] = aRBVolume;
+					}
+					if (mVoice[ch]->mChannels == 8)
+					{
+						mVoice[ch]->mChannelVolume[2] = aCVolume;
+						mVoice[ch]->mChannelVolume[3] = aSVolume;
+						mVoice[ch]->mChannelVolume[4] = (aLVolume + aLBVolume) * 0.5f;
+						mVoice[ch]->mChannelVolume[5] = (aRVolume + aRBVolume) * 0.5f;
+						mVoice[ch]->mChannelVolume[6] = aLBVolume;
+						mVoice[ch]->mChannelVolume[7] = aRBVolume;
+					}
+				FOR_ALL_VOICES_POST
+			}
+			void setInaudibleBehavior(SoLoud::handle aVoiceHandle, bool aMustTick, bool aKill)
+			{
+				FOR_ALL_VOICES_PRE
+					mVoice[ch]->mFlags &= ~(AudioSourceInstance::INAUDIBLE_KILL | AudioSourceInstance::INAUDIBLE_TICK);
+					if (aMustTick)
+					{
+						mVoice[ch]->mFlags |= AudioSourceInstance::INAUDIBLE_TICK;
+					}
+					if (aKill)
+					{
+						mVoice[ch]->mFlags |= AudioSourceInstance::INAUDIBLE_KILL;
+					}
+				FOR_ALL_VOICES_POST
+			}
+			void setLoopPoint(SoLoud::handle aVoiceHandle, SoLoud::time aLoopPoint)
+			{
+				FOR_ALL_VOICES_PRE
+					mVoice[ch]->mLoopPoint = aLoopPoint;
+				FOR_ALL_VOICES_POST
+			}
+			void setLooping(SoLoud::handle aVoiceHandle, bool aLooping)
+			{
+				FOR_ALL_VOICES_PRE
+					if (aLooping)
+					{
+						mVoice[ch]->mFlags |= AudioSourceInstance::LOOPING;
+					}
+					else
+					{
+						mVoice[ch]->mFlags &= ~AudioSourceInstance::LOOPING;
+					}
+				FOR_ALL_VOICES_POST
+			}
+			unsigned int getVoiceCount()
+			{
+				lockAudioMutex_internal();
+				int i;
+				int c = 0;
+				for (i = 0; i < (signed)mHighestVoice; i++)
+				{
+					if (mVoice[i])
+					{
+						c++;
+					}
+				}
+				unlockAudioMutex_internal();
+				return c;
+			}
+			SoLoud::time getLoopPoint(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				SoLoud::time v = mVoice[ch]->mLoopPoint;
+				unlockAudioMutex_internal();
+				return v;
+			}
+			bool getLooping(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				bool v = (mVoice[ch]->mFlags & AudioSourceInstance::LOOPING) != 0;
+				unlockAudioMutex_internal();
+				return v;
+			}
+			float getVolume(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				float v = mVoice[ch]->mSetVolume;
+				unlockAudioMutex_internal();
+				return v;
+			}
+			float getOverallVolume(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				float v = mVoice[ch]->mOverallVolume;
+				unlockAudioMutex_internal();
+				return v;
+			}
+			float getPan(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				float v = mVoice[ch]->mPan;
+				unlockAudioMutex_internal();
+				return v;
+			}
+			SoLoud::time getStreamTime(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				double v = mVoice[ch]->mStreamTime;
+				unlockAudioMutex_internal();
+				return v;
+			}
+
+			SoLoud::time getStreamPosition(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				double v = mVoice[ch]->mStreamPosition;
+				unlockAudioMutex_internal();
+				return v;
+			}
+
+			float getRelativePlaySpeed(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 1;
+				}
+				float v = mVoice[ch]->mSetRelativePlaySpeed;
+				unlockAudioMutex_internal();
+				return v;
+			}
+
+			float getSamplerate(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				float v = mVoice[ch]->mBaseSamplerate;
+				unlockAudioMutex_internal();
+				return v;
+			}
+
+			bool getPause(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				int v = !!(mVoice[ch]->mFlags & AudioSourceInstance::PAUSED);
+				unlockAudioMutex_internal();
+				return v != 0;
+			}
+
+			bool getProtectVoice(SoLoud::handle aVoiceHandle)
+			{
+				lockAudioMutex_internal();
+				int ch = getVoiceFromHandle_internal(aVoiceHandle);
+				if (ch == -1)
+				{
+					unlockAudioMutex_internal();
+					return 0;
+				}
+				int v = !!(mVoice[ch]->mFlags & AudioSourceInstance::PROTECTED);
+				unlockAudioMutex_internal();
+				return v != 0;
 			}
 		};
 
